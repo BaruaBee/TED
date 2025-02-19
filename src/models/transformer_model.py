@@ -312,7 +312,7 @@ class GraphTransformer(nn.Module):
     dims : dict -- contains dimensions for each feature type
     """
     def __init__(self, input_dims: utils.PlaceHolder, n_layers: int, hidden_mlp_dims: dict, hidden_dims: dict,
-                 output_dims: utils.PlaceHolder,DGT_configs: dict):
+                 output_dims: utils.PlaceHolder,TGT_configs: dict):
         super().__init__()
         self.n_layers = n_layers
         self.out_dim_X = output_dims.X
@@ -320,7 +320,7 @@ class GraphTransformer(nn.Module):
         self.out_dim_y = output_dims.y
         self.out_dim_charges = output_dims.charges
         n_heads=hidden_dims['n_head']
-        self.DGT_n_layer = DGT_n_layers =DGT_configs['n_layer']
+        self.TGT_n_layer = TGT_n_layers =TGT_configs['n_layer']
 
         act_fn_in = nn.ReLU()
         act_fn_out = nn.ReLU()
@@ -346,25 +346,25 @@ class GraphTransformer(nn.Module):
                                                             # last_layer=(i == n_layers - 1))
                                         for i in range(n_layers)])
         
-        cat_node_dim = (hidden_dims['dx'] * 2) // DGT_n_layers
-        cat_edge_dim = (hidden_dims['de'] * 2) // DGT_n_layers
-        n_extra_heads = DGT_configs['n_extra_heads']
-        self.cond_time = cond_time = DGT_configs['cond_time']
-        self.dist_gbf = dist_gbf = DGT_configs['dist_gbf']
-        softmax_inf = DGT_configs['softmax_inf']
-        mlp_ratio = DGT_configs['mlp_ratio']
-        self.dropout = dropout =DGT_configs['dropout']
-        gbf_name = DGT_configs['gbf_name']
+        cat_node_dim = (hidden_dims['dx'] * 2) // TGT_n_layers
+        cat_edge_dim = (hidden_dims['de'] * 2) // TGT_n_layers
+        n_extra_heads = TGT_configs['n_extra_heads']
+        self.cond_time = cond_time = TGT_configs['cond_time']
+        self.dist_gbf = dist_gbf = TGT_configs['dist_gbf']
+        softmax_inf = TGT_configs['softmax_inf']
+        mlp_ratio = TGT_configs['mlp_ratio']
+        self.dropout = dropout =TGT_configs['dropout']
+        gbf_name = TGT_configs['gbf_name']
         time_dim = hidden_dims['dx'] * 4
-        self.spatial_cut_off = DGT_configs['spatial_cut_off']
-        self.CoM = DGT_configs['CoM']
+        self.spatial_cut_off = TGT_configs['spatial_cut_off']
+        self.CoM = TGT_configs['CoM']
         
         if dist_gbf:
             self.dist_dim = dist_dim= hidden_dims['de']
         else:
             self.dist_dim = dist_dim= 1
         
-        in_edge_dim = DGT_configs['edge_ch'] * 2 + dist_dim
+        in_edge_dim = TGT_configs['edge_ch'] * 2 + dist_dim
         
         if self.dist_gbf:
             self.dist_layer = eval(gbf_name)(dist_dim, time_dim)
@@ -372,28 +372,28 @@ class GraphTransformer(nn.Module):
         hidden_dim = hidden_dims['dx'] 
         edge_hidden_dim = hidden_dims['de']
 
-        in_node_dim = DGT_configs['atom_types'] + \
-            int(DGT_configs['include_fc_charge'])
+        in_node_dim = TGT_configs['atom_types'] + \
+            int(TGT_configs['include_fc_charge'])
         self.node_emb = nn.Linear(in_node_dim + 2, hidden_dim)
         self.edge_emb = nn.Linear(in_edge_dim, edge_hidden_dim)
 
         self.node_pred_mlp = nn.Sequential(
-            nn.Linear(cat_node_dim * DGT_n_layers + hidden_dim, hidden_dim),
+            nn.Linear(cat_node_dim * TGT_n_layers + hidden_dim, hidden_dim),
             nn.SiLU(),
             nn.Linear(hidden_dim, hidden_dim // 2),
             nn.SiLU(),
             nn.Linear(hidden_dim // 2, in_node_dim + 2)
         )
         self.edge_type_mlp = nn.Sequential(
-            nn.Linear(cat_edge_dim * DGT_n_layers +
+            nn.Linear(cat_edge_dim * TGT_n_layers +
                       edge_hidden_dim, edge_hidden_dim),
             nn.SiLU(),
             nn.Linear(edge_hidden_dim, edge_hidden_dim // 2),
             nn.SiLU(),
-            nn.Linear(edge_hidden_dim // 2, DGT_configs['edge_ch'] - 1)
+            nn.Linear(edge_hidden_dim // 2, TGT_configs['edge_ch'] - 1)
         )
         self.edge_exist_mlp = nn.Sequential(
-            nn.Linear(cat_edge_dim * DGT_n_layers +
+            nn.Linear(cat_edge_dim * TGT_n_layers +
                       edge_hidden_dim, edge_hidden_dim),
             nn.SiLU(),
             nn.Linear(edge_hidden_dim, edge_hidden_dim // 2),
@@ -401,10 +401,10 @@ class GraphTransformer(nn.Module):
             nn.Linear(edge_hidden_dim // 2, 1)
         )
         
-        for i in range(DGT_n_layers):
+        for i in range(TGT_n_layers):
             self.add_module("e_block_%d" % i, EquivariantMixBlock(node_dim=hidden_dims['dx'], edge_dim=hidden_dims['de'], time_dim=time_dim, num_extra_heads=n_extra_heads,
                             num_heads=n_heads, cond_time=cond_time, dist_gbf=dist_gbf, softmax_inf=softmax_inf, mlp_ratio=mlp_ratio, dropout=dropout,
-                            gbf_name=gbf_name, trans_name=DGT_configs['trans_name']))
+                            gbf_name=gbf_name, trans_name=TGT_configs['trans_name']))
             self.add_module("node_%d" % i, nn.Linear(hidden_dims['dx'], cat_node_dim))
             self.add_module("edge_%d" % i, nn.Linear(hidden_dims['de'], cat_edge_dim))
 
@@ -434,7 +434,7 @@ class GraphTransformer(nn.Module):
         E_to_out = data.E[..., :self.out_dim_E]
         y_to_out = data.y[..., :self.out_dim_y]
 
-        # start DGT
+        # start TGT
         # init input
         input_x = X.reshape(bs*n, -1).float()
         input_pos = pos = data.pos.clone().reshape(bs * n, -1)
@@ -460,13 +460,13 @@ class GraphTransformer(nn.Module):
         h = input_x.float()
         edge_attr = input_e.float()
 
-        # run DGT Blocks
+        # run TGT Blocks
         atom_hids = [h]
         edge_hids = [edge_attr]
 
-        # DGT_input = utils.PlaceHolder(pos=input_pos, X=atom_hids, E=edge_hids, charges=None, y=y, node_mask=input_node_mask).mask()
+        # TGT_input = utils.PlaceHolder(pos=input_pos, X=atom_hids, E=edge_hids, charges=None, y=y, node_mask=input_node_mask).mask()
 
-        for i in range(0, self.DGT_n_layer):
+        for i in range(0, self.TGT_n_layer):
            h, edge_attr, pos = self._modules['e_block_%d' % i](
                input_pos.reshape(-1, 3), h, edge_attr, edge_index, node_mask.reshape(-1, 1), extra_adj, node_time_emb=None, edge_time_emb=None)
            if self.CoM:

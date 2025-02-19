@@ -77,7 +77,7 @@ class FullDenoisingDiffusion(pl.LightningModule):
                                       hidden_mlp_dims=cfg.model.hidden_mlp_dims,
                                       hidden_dims=cfg.model.hidden_dims,
                                       output_dims=self.output_dims,
-                                      DGT_configs=cfg.model.DGT_configs)
+                                      TGT_configs=cfg.model.TGT_configs)
 
         if cfg.model.transition == 'uniform':
             self.noise_model = DiscreteUniformTransition(output_dims=self.output_dims,

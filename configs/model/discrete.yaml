@@ -24,7 +24,7 @@ hidden_dims:
     "dim_ffy": 256,
   }
 
-DGT_configs:
+TGT_configs:
   {
     "n_extra_heads": 2,
     "mlp_ratio": 2,
@@ -39,7 +39,7 @@ DGT_configs:
     "include_fc_charge": True,
     "CoM": True,
     "trans_name": "TransMixLayer",
-    "n_layer" : 4
+    "n_layer": 4,
   }
 
 lambda_train: [3, 0.4, 1, 2, 0]
